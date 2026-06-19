@@ -13,7 +13,7 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(
   cors({
-    origin:"http://localhost:3000", 
+    origin: "http://localhost:3000", 
     credentials: true,
   }),
 );
@@ -41,158 +41,52 @@ async function run() {
     const transactionsCollection = db.collection("transactions");
     const commentsCollection = db.collection("comments");
 
-    // -------------------------------------------------------------------------
-    // ১. USER & AUTHENTICATION API (JWT ছাড়া)
-    // -------------------------------------------------------------------------
+  
+    // 📥 ১. POST Method: নতুন আর্টওয়ার্ক সেভ করা
+   
+    app.post("/api/artworks", async (req, res) => {
+      try {
+        const artworkData = req.body;
+        
+      
+        if (!artworkData.title || !artworkData.image || !artworkData.artistEmail) {
+          return res.status(400).json({ success: false, error: "Missing required fields" });
+        }
 
-    // Register/Save User
-    app.post("/api/users", async (req, res) => {
-      const user = req.body;
-      const query = { email: user.email };
-      const existingUser = await usersCollection.findOne(query);
+    
+        const result = await artworksCollection.insertOne({
+          title: artworkData.title,
+          description: artworkData.description,
+          category: artworkData.category,
+          price: Number(artworkData.price), 
+          image: artworkData.image,
+          artistName: artworkData.artistName,
+          artistEmail: artworkData.artistEmail,
+          createdAt: new Date()
+        });
 
-      if (existingUser) {
-        return res.send({ message: "User already exists", insertedId: null });
+        res.status(201).json(result);
+
+      } catch (error) {
+        console.error("POST /api/artworks error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
       }
-
-      const newUser = {
-        name: user.name,
-        email: user.email,
-        role: user.role || "user", // user, artist, admin
-        subscriptionTier: "free",
-        maxPurchases: 3,
-        purchasedCount: 0,
-        createdAt: new Date(),
-      };
-      const result = await usersCollection.insertOne(newUser);
-      res.send(result);
     });
-
-    // Get User Profile Data
-    app.get("/api/users/profile/:email", async (req, res) => {
-      const email = req.params.email;
-      const user = await usersCollection.findOne({ email });
-      if (!user) return res.status(404).send({ message: "User not found" });
-      res.send(user);
-    });
-
-    // -------------------------------------------------------------------------
-    // ২. ARTWORKS CRUD + SEARCH + FILTER + PAGINATION
-    // -------------------------------------------------------------------------
-
-    // Get All Artworks with Search, Filter & Pagination
+    
+    // 📤 ২. GET Method: 
     app.get("/api/artworks", async (req, res) => {
       try {
-        const {
-          search,
-          category,
-          minPrice,
-          maxPrice,
-          sort,
-          page = 1,
-          limit = 6,
-        } = req.query;
-
-        let query = {};
-        if (search) {
-          query.$or = [
-            { title: { $regex: search, $options: "i" } },
-            { artistName: { $regex: search, $options: "i" } },
-          ];
-        }
-        if (category) query.category = category;
-
-        if (minPrice || maxPrice) {
-          query.price = {};
-          if (minPrice) query.price.$gte = parseFloat(minPrice);
-          if (maxPrice) query.price.$lte = parseFloat(maxPrice);
-        }
-
-        let sortOptions = {};
-        if (sort === "newest") sortOptions.createdAt = -1;
-        else if (sort === "priceLowHigh") sortOptions.price = 1;
-        else if (sort === "priceHighLow") sortOptions.price = -1;
-
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const totalArtworks = await artworksCollection.countDocuments(query);
-
-        const artworks = await artworksCollection
-          .find(query)
-          .sort(sortOptions)
-          .skip(skip)
-          .limit(parseInt(limit))
-          .toArray();
-
-        res.send({
-          artworks,
-          totalArtworks,
-          totalPages: Math.ceil(totalArtworks / limit),
-        });
+        // 
+        const result = await artworksCollection.find({}).sort({ _id: -1 }).toArray();
+        res.status(200).json({ success: true, data: result });
       } catch (error) {
-        res.status(500).send({ message: error.message });
+        console.error("GET /api/artworks error:", error);
+        res.status(500).json({ error: "Failed to fetch artworks" });
       }
     });
 
-    // Get single Artwork Details
-    app.get("/api/artworks/:id", async (req, res) => {
-      const id = req.params.id;
-      const result = await artworksCollection.findOne({
-        _id: new ObjectId(id),
-      });
-      if (!result)
-        return res.status(404).send({ message: "Artwork not found" });
-      res.send(result);
-    });
-
-    // Add Artwork (Artist only)
-    app.post("/api/artworks", async (req, res) => {
-      const artwork = req.body;
-      artwork.price = parseFloat(artwork.price);
-      artwork.createdAt = new Date();
-      const result = await artworksCollection.insertOne(artwork);
-      res.send(result);
-    });
-
-    // Delete Artwork
-    app.delete("/api/artworks/:id", async (req, res) => {
-      const id = req.params.id;
-      const result = await artworksCollection.deleteOne({
-        _id: new ObjectId(id),
-      });
-      res.send(result);
-    });
-
-    // -------------------------------------------------------------------------
-    // ৩. COMMENT SYSTEM
-    // -------------------------------------------------------------------------
-
-    // Post a Comment
-    app.post("/api/artworks/:id/comments", async (req, res) => {
-      const artworkId = req.params.id;
-      const { userId, userEmail, userName, comment } = req.body;
-
-      const newComment = {
-        artworkId: new ObjectId(artworkId),
-        userId,
-        userEmail,
-        userName,
-        comment,
-        createdAt: new Date(),
-      };
-      const result = await commentsCollection.insertOne(newComment);
-      res.send(result);
-    });
-
-    // Get comments for specific artwork
-    app.get("/api/artworks/:id/comments", async (req, res) => {
-      const artworkId = req.params.id;
-      const result = await commentsCollection
-        .find({ artworkId: new ObjectId(artworkId) })
-        .toArray();
-      res.send(result);
-    });
   } catch (error) {
-    console.error(error);
+    console.error("MongoDB Connection Error:", error);
   }
 }
 run().catch(console.dir);
