@@ -84,6 +84,20 @@ async function run() {
         res.status(500).json({ error: "Failed to fetch artworks" });
       }
     });
+// dinamick routh 
+    app.get("/api/artworks/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await artworksCollection.findOne(query);
+    if (!result) {
+      return res.status(404).json({ success: false, error: "Artwork not found" });
+    }
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Invalid ID format or Server Error" });
+  }
+});
 
   } catch (error) {
     console.error("MongoDB Connection Error:", error);
