@@ -99,6 +99,69 @@ async function run() {
   }
 });
 
+
+
+// 📤 ক) নির্দিষ্ট ইমেইলের ওপর ভিত্তি করে শুধুমাত্র ওই আর্টিস্টের আর্টওয়ার্কগুলো খোঁজা
+app.get("/api/my-artworks", async (req, res) => {
+  try {
+    const email = req.query.email;
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Email query param is required" });
+    }
+    const query = { artistEmail: email };
+    const result = await artworksCollection.find(query).sort({ _id: -1 }).toArray();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error("Error fetching user artworks:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// 🗑️ খ) আর্টওয়ার্ক ডিলিট করার এন্ডপয়েন্ট
+app.delete("/api/artworks/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await artworksCollection.deleteOne(query);
+    res.status(200).json(result); // { acknowledged: true, deletedCount: 1 }
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete artwork" });
+  }
+});
+
+// 📝 গ) আর্টওয়ার্ক আপডেট (Edit) করার এন্ডপয়েন্ট
+app.put("/api/artworks/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updatedData = req.body;
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: {
+        title: updatedData.title,
+        description: updatedData.description,
+        category: updatedData.category,
+        price: Number(updatedData.price),
+        image: updatedData.image,
+      },
+    };
+    const result = await artworksCollection.updateOne(filter, updateDoc);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update artwork" });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
   } catch (error) {
     console.error("MongoDB Connection Error:", error);
   }
