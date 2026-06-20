@@ -41,10 +41,7 @@ async function run() {
     const transactionsCollection = db.collection("transactions");
     const commentsCollection = db.collection("comments");
 
-  
-    // 📥 ১. POST Method
-   
-   // 📥 ১. POST Method:
+    // ১. POST Method:
     app.post("/api/artworks", async (req, res) => {
       try {
         const artworkData = req.body;
@@ -53,14 +50,10 @@ async function run() {
           return res.status(400).json({ success: false, error: "Missing required fields" });
         }
 
-       
         const currentCount = await artworksCollection.countDocuments({ artistEmail: artworkData.artistEmail });
-
-     
         const artistUser = await usersCollection.findOne({ email: artworkData.artistEmail });
         const userTier = artistUser?.tier || "free"; // ডিফল্ট 'free'
 
-   
         if (userTier === "free" && currentCount >= 3) {
           return res.status(403).json({ 
             success: false, 
@@ -68,7 +61,6 @@ async function run() {
           });
         }
 
-        
         const result = await artworksCollection.insertOne({
           title: artworkData.title,
           description: artworkData.description,
@@ -88,13 +80,68 @@ async function run() {
       }
     });
 
+    // পেমেন্ট সফল হওয়ার পর ইউজারকে প্রিমিয়ামে রূপান্তর করার এবং ট্রানজেকশন ডাটা সেভ করার রুট
+    app.put("/api/profile/upgrade-premium", async (req, res) => {
+      try {
+        const { email, amount, paymentIntentId } = req.body;
 
+        if (!email) {
+          return res.status(400).json({ success: false, message: "Email is required to upgrade profile." });
+        }
 
+        const filter = { email: email };
+        const updateDoc = {
+          $set: {
+            isPremium: true,
+            tier: "premium", 
+            updatedAt: new Date()
+          },
+        };
+
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        
+        // ট্রানজেকশন হিস্টোরি সেভ করা হচ্ছে
+        const transactionDoc = {
+          email: email,
+          amount: Number(amount) || 49.00,
+          transactionId: paymentIntentId || `TXN_${Date.now()}`,
+          packageName: "Premium Tier Upgrade",
+          date: new Date()
+        };
+        await transactionsCollection.insertOne(transactionDoc);
+        
+        if (result.modifiedCount > 0 || result.matchedCount > 0) {
+          res.status(200).json({ success: true, message: "Account upgraded to Premium and transaction recorded successfully!" });
+        } else {
+          res.status(404).json({ success: false, message: "User not found to upgrade." });
+        }
+      } catch (error) {
+        console.error("PUT /api/profile/upgrade-premium error:", error);
+        res.status(500).json({ success: false, message: "Server error during premium upgrade" });
+      }
+    });
+
+    // Sales Analytics পেজের জন্য পেমেন্ট হিস্টোরি তুলে আনার রুট
+    app.get("/api/payments/history", async (req, res) => {
+      try {
+        const { email } = req.query;
+        if (!email) {
+          return res.status(400).json({ success: false, error: "Email query param is required" });
+        }
+
+        const query = { email: email };
+        const result = await transactionsCollection.find(query).sort({ date: -1 }).toArray();
+        
+        res.status(200).json({ success: true, data: result });
+      } catch (error) {
+        console.error("GET /api/payments/history error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
 
     // 📤 ২. GET Method: 
     app.get("/api/artworks", async (req, res) => {
       try {
-        // 
         const result = await artworksCollection.find({}).sort({ _id: -1 }).toArray();
         res.status(200).json({ success: true, data: result });
       } catch (error) {
@@ -102,77 +149,70 @@ async function run() {
         res.status(500).json({ error: "Failed to fetch artworks" });
       }
     });
-// dinamick routh 
+
+    // dinamick routh 
     app.get("/api/artworks/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const query = { _id: new ObjectId(id) };
-    const result = await artworksCollection.findOne(query);
-    if (!result) {
-      return res.status(404).json({ success: false, error: "Artwork not found" });
-    }
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(500).json({ error: "Invalid ID format or Server Error" });
-  }
-});
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await artworksCollection.findOne(query);
+        if (!result) {
+          return res.status(404).json({ success: false, error: "Artwork not found" });
+        }
+        res.status(200).json(result);
+      } catch (error) {
+        res.status(500).json({ error: "Invalid ID format or Server Error" });
+      }
+    });
 
+    app.get("/api/my-artworks", async (req, res) => {
+      try {
+        const email = req.query.email;
+        if (!email) {
+          return res.status(400).json({ success: false, error: "Email query param is required" });
+        }
+        const query = { artistEmail: email };
+        const result = await artworksCollection.find(query).sort({ _id: -1 }).toArray();
+        res.status(200).json({ success: true, data: result });
+      } catch (error) {
+        console.error("Error fetching user artworks:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
 
+    app.delete("/api/artworks/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await artworksCollection.deleteOne(query);
+        res.status(200).json(result); 
+      } catch (error) {
+        res.status(500).json({ error: "Failed to delete artwork" });
+      }
+    });
 
-app.get("/api/my-artworks", async (req, res) => {
-  try {
-    const email = req.query.email;
-    if (!email) {
-      return res.status(400).json({ success: false, error: "Email query param is required" });
-    }
-    const query = { artistEmail: email };
-    const result = await artworksCollection.find(query).sort({ _id: -1 }).toArray();
-    res.status(200).json({ success: true, data: result });
-  } catch (error) {
-    console.error("Error fetching user artworks:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+    app.put("/api/artworks/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const updatedData = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: {
+            title: updatedData.title,
+            description: updatedData.description,
+            category: updatedData.category,
+            price: Number(updatedData.price),
+            image: updatedData.image,
+          },
+        };
+        const result = await artworksCollection.updateOne(filter, updateDoc);
+        res.status(200).json(result);
+      } catch (error) {
+        res.status(500).json({ error: "Failed to update artwork" });
+      }
+    });
 
-
-app.delete("/api/artworks/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const query = { _id: new ObjectId(id) };
-    const result = await artworksCollection.deleteOne(query);
-    res.status(200).json(result); // { acknowledged: true, deletedCount: 1 }
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete artwork" });
-  }
-});
-
-app.put("/api/artworks/:id", async (req, res) => {
-  try {
-    const id = req.params.id;
-    const updatedData = req.body;
-    const filter = { _id: new ObjectId(id) };
-    const updateDoc = {
-      $set: {
-        title: updatedData.title,
-        description: updatedData.description,
-        category: updatedData.category,
-        price: Number(updatedData.price),
-        image: updatedData.image,
-      },
-    };
-    const result = await artworksCollection.updateOne(filter, updateDoc);
-    res.status(200).json(result);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update artwork" });
-  }
-});
-
-
-
-
-
-
-app.get("/api/profile", async (req, res) => {
+    app.get("/api/profile", async (req, res) => {
       try {
         const id = req.query.id;
         if (!id || id === "undefined") {
@@ -183,7 +223,6 @@ app.get("/api/profile", async (req, res) => {
         const userProfile = await usersCollection.findOne(query);
 
         if (!userProfile) {
-       
           return res.status(200).json({ success: true, data: null, message: "New user profile context" });
         }
 
@@ -204,7 +243,7 @@ app.get("/api/profile", async (req, res) => {
         }
 
         const filter = { _id: new ObjectId(id) };
-        const options = { upsert: true }; // আইডি কালেকশনে না থাকলে নতুন ক্রিয়েট করবে, থাকলে আপডেট করবে
+        const options = { upsert: true }; 
 
         const updateDoc = {
           $set: {
@@ -225,13 +264,6 @@ app.get("/api/profile", async (req, res) => {
         res.status(500).json({ success: false, message: "Server error during profile update" });
       }
     });
-
-
-
-
-
-
-
 
   } catch (error) {
     console.error("MongoDB Connection Error:", error);
