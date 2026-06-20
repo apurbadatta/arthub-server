@@ -42,18 +42,33 @@ async function run() {
     const commentsCollection = db.collection("comments");
 
   
-    // 📥 ১. POST Method: নতুন আর্টওয়ার্ক সেভ করা
+    // 📥 ১. POST Method
    
+   // 📥 ১. POST Method:
     app.post("/api/artworks", async (req, res) => {
       try {
         const artworkData = req.body;
         
-      
         if (!artworkData.title || !artworkData.image || !artworkData.artistEmail) {
           return res.status(400).json({ success: false, error: "Missing required fields" });
         }
 
-    
+       
+        const currentCount = await artworksCollection.countDocuments({ artistEmail: artworkData.artistEmail });
+
+     
+        const artistUser = await usersCollection.findOne({ email: artworkData.artistEmail });
+        const userTier = artistUser?.tier || "free"; // ডিফল্ট 'free'
+
+   
+        if (userTier === "free" && currentCount >= 3) {
+          return res.status(403).json({ 
+            success: false, 
+            error: "Limit Reached! standard accounts are limited to 3 artworks. Please upgrade your subscription tier." 
+          });
+        }
+
+        
         const result = await artworksCollection.insertOne({
           title: artworkData.title,
           description: artworkData.description,
@@ -72,7 +87,10 @@ async function run() {
         res.status(500).json({ error: "Internal Server Error" });
       }
     });
-    
+
+
+
+
     // 📤 ২. GET Method: 
     app.get("/api/artworks", async (req, res) => {
       try {
@@ -101,7 +119,6 @@ async function run() {
 
 
 
-// 📤 ক) নির্দিষ্ট ইমেইলের ওপর ভিত্তি করে শুধুমাত্র ওই আর্টিস্টের আর্টওয়ার্কগুলো খোঁজা
 app.get("/api/my-artworks", async (req, res) => {
   try {
     const email = req.query.email;
@@ -117,7 +134,7 @@ app.get("/api/my-artworks", async (req, res) => {
   }
 });
 
-// 🗑️ খ) আর্টওয়ার্ক ডিলিট করার এন্ডপয়েন্ট
+
 app.delete("/api/artworks/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -129,7 +146,6 @@ app.delete("/api/artworks/:id", async (req, res) => {
   }
 });
 
-// 📝 গ) আর্টওয়ার্ক আপডেট (Edit) করার এন্ডপয়েন্ট
 app.put("/api/artworks/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -154,6 +170,61 @@ app.put("/api/artworks/:id", async (req, res) => {
 
 
 
+
+
+app.get("/api/profile", async (req, res) => {
+      try {
+        const id = req.query.id;
+        if (!id || id === "undefined") {
+          return res.status(400).json({ success: false, message: "User Unique ID is required" });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const userProfile = await usersCollection.findOne(query);
+
+        if (!userProfile) {
+       
+          return res.status(200).json({ success: true, data: null, message: "New user profile context" });
+        }
+
+        res.status(200).json({ success: true, data: userProfile });
+      } catch (error) {
+        console.error("GET /api/profile error:", error);
+        res.status(500).json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
+    app.put("/api/profile/update", async (req, res) => {
+      try {
+        const id = req.query.id;
+        const updatedData = req.body;
+
+        if (!id || id === "undefined") {
+          return res.status(400).json({ success: false, message: "User Unique ID is required to update profile." });
+        }
+
+        const filter = { _id: new ObjectId(id) };
+        const options = { upsert: true }; // আইডি কালেকশনে না থাকলে নতুন ক্রিয়েট করবে, থাকলে আপডেট করবে
+
+        const updateDoc = {
+          $set: {
+            name: updatedData.name,
+            email: updatedData.email,
+            role: updatedData.role,
+            profileStyle: updatedData.profileStyle,
+            avatar: updatedData.avatar,
+            image: updatedData.avatar,
+            updatedAt: new Date()
+          },
+        };
+
+        const result = await usersCollection.updateOne(filter, updateDoc, options);
+        res.status(200).json({ success: true, message: "Profile updated successfully!", data: result });
+      } catch (error) {
+        console.error("PUT /api/profile/update error:", error);
+        res.status(500).json({ success: false, message: "Server error during profile update" });
+      }
+    });
 
 
 
