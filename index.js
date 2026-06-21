@@ -399,7 +399,7 @@ async function run() {
       }
     });
 
-    // (user / artist / admin) API
+    // (user / artist / admin) API add
     app.patch("/api/admin/update-role", async (req, res) => {
       try {
         const { userId, newRole } = req.body;
