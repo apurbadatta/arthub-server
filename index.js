@@ -386,6 +386,62 @@ async function run() {
       }
     });
 
+  
+    //  ADMIN ROUTHS: USER MANAGEMENT
+    app.get("/api/admin/users", async (req, res) => {
+      try {
+       
+        const result = await usersCollection.find({}).toArray();
+        res.status(200).json({ success: true, data: result });
+      } catch (error) {
+        console.error("GET /api/admin/users error:", error);
+        res.status(500).json({ success: false, error: "Failed to fetch users list" });
+      }
+    });
+
+    // (user / artist / admin) API
+    app.patch("/api/admin/update-role", async (req, res) => {
+      try {
+        const { userId, newRole } = req.body;
+
+        if (!userId || !newRole) {
+          return res.status(400).json({ success: false, error: "Missing userId or newRole" });
+        }
+        const validRoles = ["user", "artist", "admin"];
+        if (!validRoles.includes(newRole.toLowerCase())) {
+          return res.status(400).json({ success: false, error: "Invalid role type" });
+        }
+
+        const filter = { _id: new ObjectId(userId) };
+        const updateDoc = {
+          $set: {
+            role: newRole.toLowerCase(),
+            updatedAt: new Date()
+          },
+        };
+
+        const result = await usersCollection.updateOne(filter, updateDoc);
+
+        if (result.modifiedCount > 0 || result.matchedCount > 0) {
+          res.status(200).json({ 
+            success: true, 
+            message: `User role successfully updated to ${newRole}! 🎉` 
+          });
+        } else {
+          res.status(404).json({ success: false, error: "User not found to update role" });
+        }
+      } catch (error) {
+        console.error("PATCH /api/admin/update-role error:", error);
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+      }
+    });
+
+
+
+
+
+
+
   } catch (error) {
     console.error("MongoDB Connection Error:", error);
   }
