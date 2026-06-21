@@ -40,6 +40,7 @@ async function run() {
     const artworksCollection = db.collection("artworks");
     const transactionsCollection = db.collection("transactions");
     const commentsCollection = db.collection("comments");
+    const purchasesCollection = db.collection("purchased_artworks");
 
     // ১. POST Method:
     app.post("/api/artworks", async (req, res) => {
@@ -80,7 +81,7 @@ async function run() {
       }
     });
 
-    // পেমেন্ট সফল হওয়ার পর ইউজারকে প্রিমিয়ামে রূপান্তর করার এবং ট্রানজেকশন ডাটা সেভ করার রুট
+    
     app.put("/api/profile/upgrade-premium", async (req, res) => {
       try {
         const { email, amount, paymentIntentId } = req.body;
@@ -94,13 +95,14 @@ async function run() {
           $set: {
             isPremium: true,
             tier: "premium", 
+            plan: "premium",
             updatedAt: new Date()
           },
         };
 
         const result = await usersCollection.updateOne(filter, updateDoc);
         
-        // ট্রানজেকশন হিস্টোরি সেভ করা হচ্ছে
+        
         const transactionDoc = {
           email: email,
           amount: Number(amount) || 49.00,
@@ -121,7 +123,126 @@ async function run() {
       }
     });
 
-    // Sales Analytics পেজের জন্য পেমেন্ট হিস্টোরি তুলে আনার রুট
+    // User subscription tier upgrade
+    app.put("/api/profile/upgrade-user-tier", async (req, res) => {
+      try {
+        const { email, tier, amount, paymentIntentId } = req.body;
+
+        if (!email || !tier) {
+          return res.status(400).json({ success: false, message: "Email and tier are required." });
+        }
+
+        const filter = { email: email };
+        const updateDoc = {
+          $set: {
+            tier: tier.toLowerCase(),
+            plan: tier.toLowerCase(),
+            isPremium: tier.toLowerCase() === "premium",
+            updatedAt: new Date()
+          },
+        };
+
+        const result = await usersCollection.updateOne(filter, updateDoc);
+
+        const transactionDoc = {
+          email: email,
+          amount: Number(amount) || 0,
+          transactionId: paymentIntentId || `TXN_${Date.now()}`,
+          packageName: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Tier Upgrade`,
+          date: new Date()
+        };
+        await transactionsCollection.insertOne(transactionDoc);
+
+        res.status(200).json({ success: true, message: `Account upgraded to ${tier} successfully!` });
+      } catch (error) {
+        console.error("PUT /api/profile/upgrade-user-tier error:", error);
+        res.status(500).json({ success: false, message: "Server error during tier upgrade" });
+      }
+    });
+
+    // Post purchases (buy artwork under tier limits)
+    app.post("/api/purchases", async (req, res) => {
+      try {
+        const { userEmail, artworkId } = req.body;
+
+        if (!userEmail || !artworkId) {
+          return res.status(400).json({ success: false, error: "userEmail and artworkId are required" });
+        }
+
+        // Get artwork details
+        const artwork = await artworksCollection.findOne({ _id: new ObjectId(artworkId) });
+        if (!artwork) {
+          return res.status(404).json({ success: false, error: "Artwork not found" });
+        }
+
+        // Get user details for subscription verification
+        const user = await usersCollection.findOne({ email: userEmail });
+        const userTier = user?.tier?.toLowerCase() || "free";
+
+        // Count existing purchases
+        const purchasedCount = await purchasesCollection.countDocuments({ userEmail: userEmail });
+
+        // Enforce Limits
+        let limit = 3;
+        if (userTier === "pro") limit = 9;
+        if (userTier === "premium") limit = Infinity;
+
+        if (purchasedCount >= limit) {
+          return res.status(403).json({
+            success: false,
+            error: `Limit Reached! Your subscription (${userTier}) is limited to ${limit} artworks. Please upgrade your subscription.`
+          });
+        }
+
+        // Check if already purchased
+        const existingPurchase = await purchasesCollection.findOne({
+          userEmail: userEmail,
+          artworkId: new ObjectId(artworkId)
+        });
+
+        if (existingPurchase) {
+          return res.status(400).json({ success: false, error: "You have already purchased this artwork." });
+        }
+
+        // Log the purchase
+        const purchaseDoc = {
+          userEmail,
+          artworkId: new ObjectId(artworkId),
+          artworkTitle: artwork.title,
+          artworkImage: artwork.image,
+          artistName: artwork.artistName,
+          artistEmail: artwork.artistEmail,
+          price: Number(artwork.price),
+          purchaseDate: new Date(),
+          referenceId: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+          status: "Successful"
+        };
+
+        const result = await purchasesCollection.insertOne(purchaseDoc);
+        res.status(201).json({ success: true, message: "Artwork purchased successfully!", data: result });
+      } catch (error) {
+        console.error("POST /api/purchases error:", error);
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+      }
+    });
+
+    // Get user purchases
+    app.get("/api/purchases", async (req, res) => {
+      try {
+        const { email } = req.query;
+        if (!email) {
+          return res.status(400).json({ success: false, error: "Email query param is required" });
+        }
+
+        const result = await purchasesCollection.find({ userEmail: email }).sort({ purchaseDate: -1 }).toArray();
+        res.status(200).json({ success: true, data: result });
+      } catch (error) {
+        console.error("GET /api/purchases error:", error);
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+      }
+    });
+
+    // Sales Analytics
     app.get("/api/payments/history", async (req, res) => {
       try {
         const { email } = req.query;
