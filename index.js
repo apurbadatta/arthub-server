@@ -53,7 +53,7 @@ async function run() {
 
         const currentCount = await artworksCollection.countDocuments({ artistEmail: artworkData.artistEmail });
         const artistUser = await usersCollection.findOne({ email: artworkData.artistEmail });
-        const userTier = artistUser?.tier || "free"; // ডিফল্ট 'free'
+        const userTier = artistUser?.tier || "free"; // defolt 'free'
 
         if (userTier === "free" && currentCount >= 3) {
           return res.status(403).json({ 
@@ -493,6 +493,73 @@ app.patch("/api/admin/approve-artwork/:id", async (req, res) => {
         res.status(200).json({ success: true, data: formattedData });
       } catch (error) {
         console.error("GET /api/admin/transactions error:", error);
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+      }
+    });
+
+
+
+   
+    // ADMIN ROUTES: ANALYTICS OVERVIEW
+  
+    app.get("/api/admin/analytics-data", async (req, res) => {
+      try {
+    
+        const totalUsers = await usersCollection.countDocuments({ role: "user" });
+        const totalArtists = await usersCollection.countDocuments({ role: "artist" });
+        const totalArtworksSold = await transactionsCollection.countDocuments({ packageName: { $exists: false } });
+
+        const revenueAggregation = await transactionsCollection.aggregate([
+          { $group: { _id: null, total: { $sum: "$amount" } } }
+        ]).toArray();
+        const totalRevenue = revenueAggregation[0]?.total || 0;
+
+      
+        const monthlySales = await transactionsCollection.aggregate([
+          {
+            $group: {
+              _id: { $dateToString: { format: "%b", date: "$date" } }, // "Jan", 
+              revenue: { $sum: "$amount" }
+            }
+          }
+        ]).toArray();
+
+       
+        const salesData = monthlySales.map(item => ({
+          date: item._id,
+          revenue: item.revenue
+        }));
+
+
+       
+        const categoryAggregation = await artworksCollection.aggregate([
+          {
+            $group: {
+              _id: "$category",
+              count: { $sum: 1 }
+            }
+          }
+        ]).toArray();
+
+        const categoryData = categoryAggregation.map(item => ({
+          name: item._id || "Uncategorized",
+          count: item.count
+        }));
+        
+        res.status(200).json({
+          success: true,
+          data: {
+            totalUsers,
+            totalArtists,
+            totalArtworksSold,
+            totalRevenue,
+            salesData: salesData.length > 0 ? salesData : [{ date: "No Data", revenue: 0 }],
+            categoryData: categoryData.length > 0 ? categoryData : [{ name: "No Data", count: 1 }]
+          }
+        });
+
+      } catch (error) {
+        console.error("GET /api/admin/analytics-data error:", error);
         res.status(500).json({ success: false, error: "Internal Server Error" });
       }
     });
