@@ -70,6 +70,7 @@ async function run() {
           image: artworkData.image,
           artistName: artworkData.artistName,
           artistEmail: artworkData.artistEmail,
+          status: "pending", // pending artist
           createdAt: new Date()
         });
 
@@ -262,14 +263,14 @@ async function run() {
 
     // 📤 ২. GET Method: 
     app.get("/api/artworks", async (req, res) => {
-      try {
-        const result = await artworksCollection.find({}).sort({ _id: -1 }).toArray();
-        res.status(200).json({ success: true, data: result });
-      } catch (error) {
-        console.error("GET /api/artworks error:", error);
-        res.status(500).json({ error: "Failed to fetch artworks" });
-      }
-    });
+  try {
+    // status "approved" 
+    const result = await artworksCollection.find({ status: "approved" }).sort({ _id: -1 }).toArray();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch artworks" });
+  }
+});
 
     // dinamick routh 
     app.get("/api/artworks/:id", async (req, res) => {
@@ -435,6 +436,47 @@ async function run() {
         res.status(500).json({ success: false, error: "Internal Server Error" });
       }
     });
+
+
+
+
+
+
+
+//  ADMIN ROUTES: ARTWORK MANAGEMENT
+
+// (pending + approved)
+app.get("/api/admin/artworks", async (req, res) => {
+  try {
+    const result = await artworksCollection.find({}).sort({ _id: -1 }).toArray();
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error("GET /api/admin/artworks error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch all artworks" });
+  }
+});
+
+
+// admin Approve and Publish API
+app.patch("/api/admin/approve-artwork/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: { status: "approved", publishedAt: new Date() }
+    };
+    
+    const result = await artworksCollection.updateOne(filter, updateDoc);
+    if (result.modifiedCount > 0) {
+      res.status(200).json({ success: true, message: "Artwork approved and published successfully! 🚀" });
+    } else {
+      res.status(404).json({ success: false, error: "Artwork not found or already approved" });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
+
 
 
 
