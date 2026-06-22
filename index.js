@@ -444,7 +444,6 @@ async function run() {
 
 
 //  ADMIN ROUTES: ARTWORK MANAGEMENT
-
 // (pending + approved)
 app.get("/api/admin/artworks", async (req, res) => {
   try {
@@ -478,7 +477,25 @@ app.patch("/api/admin/approve-artwork/:id", async (req, res) => {
 });
 
 
+    //  ADMIN ROUTES: FINANCIAL TRANSACTIONS
+  
 
+    app.get("/api/admin/transactions", async (req, res) => {
+      try {
+       
+        const result = await transactionsCollection.find({}).sort({ date: -1 }).toArray();
+        const formattedData = result.map(tx => ({
+          ...tx,
+        
+          type: tx.packageName ? "Subscription" : "Purchase"
+        }));
+
+        res.status(200).json({ success: true, data: formattedData });
+      } catch (error) {
+        console.error("GET /api/admin/transactions error:", error);
+        res.status(500).json({ success: false, error: "Internal Server Error" });
+      }
+    });
 
 
 
