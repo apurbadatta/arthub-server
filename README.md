@@ -37,8 +37,8 @@ The server architecture isolates its workload using the following modular depend
 To spin up the service locally or in production, configure a `.env` file inside your server root directory containing the following metrics:
 
 ```env
-PORT=5000
-CLIENT_URL=http://localhost:3000
-MONGODB_URI=mongodb+srv://<db_user>:<db_password>@cluster0.mongodb.net/arthub
-JWT_SECRET=your_ultra_secure_long_jwt_secret_phrase_7_days
-STRIPE_SECRET_KEY=sk_test_51...your_stripe_secret_token
+PORT=****
+CLIENT_URL=****
+MONGODB_URI=****
+JWT_SECRET=****
+STRIPE_SECRET_KEY=****
