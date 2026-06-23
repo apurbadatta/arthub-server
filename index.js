@@ -13,10 +13,11 @@ const port = process.env.PORT || 5000;
 // Middleware
 app.use(
   cors({
-    origin: "http://localhost:3000", 
+    origin: process.env.CLIENT_URL || "http://localhost:3000", 
     credentials: true,
   }),
 );
+
 app.use(express.json());
 
 // MongoDB URI
@@ -301,7 +302,7 @@ async function run() {
 });
 
     // dinamick routh 
-    app.get("/api/artworks/:id", async (req, res) => {
+    app.get("/api/artworks/:id",verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -330,7 +331,7 @@ async function run() {
       }
     });
 
-    app.delete("/api/artworks/:id", async (req, res) => {
+    app.delete("/api/artworks/:id",verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
