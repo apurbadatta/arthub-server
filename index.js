@@ -496,6 +496,133 @@ app.get("/api/payments/history", async (req, res) => {
   }
 });
 
+
+
+
+
+// ───COMMENT SYSTEM ROUTES  ───────────────────────────────────
+
+// ১. POST /api/artworks/:id/comments
+app.post("/api/artworks/:id/comments", async (req, res) => {
+  try {
+    const { commentsCollection, purchasesCollection } = await getCollections();
+    const artworkId = req.params.id;
+    const { userId, userEmail, comment } = req.body;
+
+    if (!userEmail || !comment) {
+      return res.status(400).json({ success: false, message: "Comment and user email are required." });
+    }
+    const hasPurchased = await purchasesCollection.findOne({
+      userEmail: userEmail,
+      artworkId: new ObjectId(artworkId)
+    });
+
+    if (!hasPurchased) {
+      return res.status(403).json({
+        success: false,
+        message: "Challenge Guard: You must purchase this artwork to leave a comment/review."
+      });
+    }
+    const newComment = {
+      artworkId: artworkId, 
+      userId: userId || userEmail,
+      userEmail: userEmail,
+      comment: comment,
+      createdAt: new Date()
+    };
+
+    const result = await commentsCollection.insertOne(newComment);
+    
+    res.status(201).json({
+      success: true,
+      message: "Comment published successfully!",
+      data: { ...newComment, _id: result.insertedId }
+    });
+
+  } catch (error) {
+    console.error("Error adding comment:", error);
+    res.status(500).json({ success: false, message: "Server error while adding comment" });
+  }
+});
+
+// ২. GET /api/artworks/:id/comments
+app.get("/api/artworks/:id/comments", async (req, res) => {
+  try {
+    const { commentsCollection } = await getCollections();
+    const artworkId = req.params.id;
+    
+    const comments = await commentsCollection
+      .find({ artworkId: artworkId })
+      .sort({ createdAt: -1 }) 
+      .toArray();
+
+    res.status(200).json({ success: true, data: comments });
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    res.status(500).json({ success: false, message: "Server error while fetching comments" });
+  }
+});
+
+// ৩. PUT /api/comments/:id 
+app.put("/api/comments/:id", async (req, res) => {
+  try {
+    const { commentsCollection } = await getCollections();
+    const commentId = req.params.id;
+    const { comment, userEmail } = req.body;
+
+  
+    const existingComment = await commentsCollection.findOne({ _id: new ObjectId(commentId) });
+    if (!existingComment) {
+      return res.status(404).json({ success: false, message: "Comment not found" });
+    }
+    
+    if (existingComment.userEmail !== userEmail) {
+      return res.status(401).json({ success: false, message: "Unauthorized! You can only edit your own comment." });
+    }
+
+    await commentsCollection.updateOne(
+      { _id: new ObjectId(commentId) },
+      { $set: { comment: comment, updatedAt: new Date() } }
+    );
+
+    res.status(200).json({ success: true, message: "Comment updated successfully!" });
+  } catch (error) {
+    console.error("Error updating comment:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ৪. DELETE /api/comments/:id 
+app.delete("/api/comments/:id", async (req, res) => {
+  try {
+    const { commentsCollection } = await getCollections();
+    const commentId = req.params.id;
+    const { userEmail } = req.body;
+
+    const existingComment = await commentsCollection.findOne({ _id: new ObjectId(commentId) });
+    if (!existingComment) {
+      return res.status(404).json({ success: false, message: "Comment not found" });
+    }
+
+    if (existingComment.userEmail !== userEmail) {
+      return res.status(401).json({ success: false, message: "Unauthorized! You can only delete your own comment." });
+    }
+
+    await commentsCollection.deleteOne({ _id: new ObjectId(commentId) });
+    res.status(200).json({ success: true, message: "Comment deleted successfully!" });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+
+
+
+
+
 // ─── ADMIN ROUTES ───────────────────────────────────────────────────────────
 
 // GET all users
@@ -665,7 +792,7 @@ app.get("/api/admin/analytics-data", async (req, res) => {
   }
 });
 
-// ─── START SERVER ───────────────────────────────────────────────────────────
+// ─── START SERVER ──────────────────
 app.listen(port, () => {
   console.log(`🚀 Server is flying on port ${port}`);
 });
