@@ -21,13 +21,22 @@ app.use(express.json());
 
 // MongoDB URI
 const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
+// client 
+let cachedClient = null;
+
+async function connectDB() {
+  if (cachedClient) return cachedClient;
+  const newClient = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    },
+  });
+  await newClient.connect();
+  cachedClient = newClient;
+  return cachedClient;
+}
 
 const JWKS = createRemoteJWKSet(
   new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
@@ -60,9 +69,10 @@ const verifyToken = async (req, res, next) => {
 async function run() {
   try {
     // Connect Database
-    await client.connect();
+   const client = await connectDB();
     console.log("✅ Connected to MongoDB via Native Driver!");
 
+    
     const db = client.db("artHub_DB");
     const usersCollection = db.collection("user");
     const artworksCollection = db.collection("artworks");
