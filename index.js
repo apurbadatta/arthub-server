@@ -72,7 +72,7 @@ async function run() {
     const purchasesCollection = db.collection("purchased_artworks");
 
     // ১. POST Method:
-    app.post("/api/artworks", async (req, res) => {
+    app.post("/api/artworks", verifyToken, async (req, res) => {
       try {
         const artworkData = req.body;
         
@@ -342,7 +342,7 @@ async function run() {
       }
     });
 
-    app.put("/api/artworks/:id", async (req, res) => {
+    app.put("/api/artworks/:id",verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const updatedData = req.body;
