@@ -14,7 +14,7 @@ app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 
@@ -52,7 +52,7 @@ async function getCollections() {
 
 // JWT Verify
 const JWKS = createRemoteJWKSet(
-  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`),
 );
 
 const verifyToken = async (req, res, next) => {
@@ -97,17 +97,24 @@ app.post("/api/artworks", verifyToken, async (req, res) => {
     const artworkData = req.body;
 
     if (!artworkData.title || !artworkData.image || !artworkData.artistEmail) {
-      return res.status(400).json({ success: false, error: "Missing required fields" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing required fields" });
     }
 
-    const currentCount = await artworksCollection.countDocuments({ artistEmail: artworkData.artistEmail });
-    const artistUser = await usersCollection.findOne({ email: artworkData.artistEmail });
+    const currentCount = await artworksCollection.countDocuments({
+      artistEmail: artworkData.artistEmail,
+    });
+    const artistUser = await usersCollection.findOne({
+      email: artworkData.artistEmail,
+    });
     const userTier = artistUser?.tier || "free";
 
     if (userTier === "free" && currentCount >= 3) {
       return res.status(403).json({
         success: false,
-        error: "Limit Reached! standard accounts are limited to 3 artworks. Please upgrade your subscription tier.",
+        error:
+          "Limit Reached! standard accounts are limited to 3 artworks. Please upgrade your subscription tier.",
       });
     }
 
@@ -134,8 +141,13 @@ app.post("/api/artworks", verifyToken, async (req, res) => {
 app.get("/api/artworks/:id", verifyToken, async (req, res) => {
   try {
     const { artworksCollection } = await getCollections();
-    const result = await artworksCollection.findOne({ _id: new ObjectId(req.params.id) });
-    if (!result) return res.status(404).json({ success: false, error: "Artwork not found" });
+    const result = await artworksCollection.findOne({
+      _id: new ObjectId(req.params.id),
+    });
+    if (!result)
+      return res
+        .status(404)
+        .json({ success: false, error: "Artwork not found" });
     res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ error: "Invalid ID format or Server Error" });
@@ -146,7 +158,9 @@ app.get("/api/artworks/:id", verifyToken, async (req, res) => {
 app.delete("/api/artworks/:id", verifyToken, async (req, res) => {
   try {
     const { artworksCollection } = await getCollections();
-    const result = await artworksCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+    const result = await artworksCollection.deleteOne({
+      _id: new ObjectId(req.params.id),
+    });
     res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ error: "Failed to delete artwork" });
@@ -168,7 +182,7 @@ app.put("/api/artworks/:id", verifyToken, async (req, res) => {
           price: Number(updatedData.price),
           image: updatedData.image,
         },
-      }
+      },
     );
     res.status(200).json(result);
   } catch (error) {
@@ -181,8 +195,14 @@ app.get("/api/my-artworks", async (req, res) => {
   try {
     const { artworksCollection } = await getCollections();
     const email = req.query.email;
-    if (!email) return res.status(400).json({ success: false, error: "Email query param is required" });
-    const result = await artworksCollection.find({ artistEmail: email }).sort({ _id: -1 }).toArray();
+    if (!email)
+      return res
+        .status(400)
+        .json({ success: false, error: "Email query param is required" });
+    const result = await artworksCollection
+      .find({ artistEmail: email })
+      .sort({ _id: -1 })
+      .toArray();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
@@ -194,9 +214,19 @@ app.get("/api/profile", async (req, res) => {
   try {
     const { usersCollection } = await getCollections();
     const id = req.query.id;
-    if (!id || id === "undefined") return res.status(400).json({ success: false, message: "User Unique ID is required" });
-    const userProfile = await usersCollection.findOne({ _id: new ObjectId(id) });
-    if (!userProfile) return res.status(200).json({ success: true, data: null, message: "New user profile context" });
+    if (!id || id === "undefined")
+      return res
+        .status(400)
+        .json({ success: false, message: "User Unique ID is required" });
+    const userProfile = await usersCollection.findOne({
+      _id: new ObjectId(id),
+    });
+    if (!userProfile)
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "New user profile context",
+      });
     res.status(200).json({ success: true, data: userProfile });
   } catch (error) {
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -209,7 +239,10 @@ app.put("/api/profile/update", async (req, res) => {
     const { usersCollection } = await getCollections();
     const id = req.query.id;
     const updatedData = req.body;
-    if (!id || id === "undefined") return res.status(400).json({ success: false, message: "User Unique ID is required" });
+    if (!id || id === "undefined")
+      return res
+        .status(400)
+        .json({ success: false, message: "User Unique ID is required" });
     const result = await usersCollection.updateOne(
       { _id: new ObjectId(id) },
       {
@@ -223,11 +256,17 @@ app.put("/api/profile/update", async (req, res) => {
           updatedAt: new Date(),
         },
       },
-      { upsert: true }
+      { upsert: true },
     );
-    res.status(200).json({ success: true, message: "Profile updated successfully!", data: result });
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully!",
+      data: result,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Server error during profile update" });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error during profile update" });
   }
 });
 
@@ -236,11 +275,35 @@ app.put("/api/profile/upgrade-premium", async (req, res) => {
   try {
     const { usersCollection, transactionsCollection } = await getCollections();
     const { email, amount, paymentIntentId } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: "Email is required" });
+    
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    if (paymentIntentId) {
+      const existingTransaction = await transactionsCollection.findOne({
+        transactionId: paymentIntentId
+      });
+      if (existingTransaction) {
+        return res.status(200).json({
+          success: true,
+          message: "Payment already processed. Premium is already active.",
+        });
+      }
+    }
 
     const result = await usersCollection.updateOne(
       { email },
-      { $set: { isPremium: true, tier: "premium", plan: "premium", updatedAt: new Date() } }
+      {
+        $set: {
+          isPremium: true,
+          tier: "premium",
+          plan: "premium",
+          updatedAt: new Date(),
+        },
+      },
     );
 
     await transactionsCollection.insertOne({
@@ -252,21 +315,45 @@ app.put("/api/profile/upgrade-premium", async (req, res) => {
     });
 
     if (result.modifiedCount > 0 || result.matchedCount > 0) {
-      res.status(200).json({ success: true, message: "Account upgraded to Premium successfully!" });
+      res.status(200).json({
+        success: true,
+        message: "Account upgraded to Premium successfully!",
+      });
     } else {
       res.status(404).json({ success: false, message: "User not found" });
     }
   } catch (error) {
+    console.error("Error during premium upgrade:", error);
     res.status(500).json({ success: false, message: "Server error during premium upgrade" });
   }
 });
+
+
+
 
 // PUT upgrade user tier
 app.put("/api/profile/upgrade-user-tier", async (req, res) => {
   try {
     const { usersCollection, transactionsCollection } = await getCollections();
     const { email, tier, amount, paymentIntentId } = req.body;
-    if (!email || !tier) return res.status(400).json({ success: false, message: "Email and tier are required" });
+    
+    if (!email || !tier) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and tier are required" });
+    }
+
+    if (paymentIntentId) {
+      const existingTxn = await transactionsCollection.findOne({
+        transactionId: paymentIntentId
+      });
+      if (existingTxn) {
+        return res.status(200).json({
+          success: true,
+          message: "Transaction already processed. Premium is active.",
+        });
+      }
+    }
 
     await usersCollection.updateOne(
       { email },
@@ -277,7 +364,7 @@ app.put("/api/profile/upgrade-user-tier", async (req, res) => {
           isPremium: tier.toLowerCase() === "premium",
           updatedAt: new Date(),
         },
-      }
+      },
     );
 
     await transactionsCollection.insertOne({
@@ -288,36 +375,65 @@ app.put("/api/profile/upgrade-user-tier", async (req, res) => {
       date: new Date(),
     });
 
-    res.status(200).json({ success: true, message: `Account upgraded to ${tier} successfully!` });
+    res.status(200).json({
+      success: true,
+      message: `Account upgraded to ${tier} successfully!`,
+    });
   } catch (error) {
+    console.error("Error during tier upgrade:", error);
     res.status(500).json({ success: false, message: "Server error during tier upgrade" });
   }
 });
 
+
+
+
 // POST purchase artwork
 app.post("/api/purchases", async (req, res) => {
   try {
-    const { artworksCollection, usersCollection, purchasesCollection } = await getCollections();
+    const { artworksCollection, usersCollection, purchasesCollection } =
+      await getCollections();
     const { userEmail, artworkId } = req.body;
-    if (!userEmail || !artworkId) return res.status(400).json({ success: false, error: "userEmail and artworkId are required" });
+    if (!userEmail || !artworkId)
+      return res.status(400).json({
+        success: false,
+        error: "userEmail and artworkId are required",
+      });
 
-    const artwork = await artworksCollection.findOne({ _id: new ObjectId(artworkId) });
-    if (!artwork) return res.status(404).json({ success: false, error: "Artwork not found" });
+    const artwork = await artworksCollection.findOne({
+      _id: new ObjectId(artworkId),
+    });
+    if (!artwork)
+      return res
+        .status(404)
+        .json({ success: false, error: "Artwork not found" });
 
     const user = await usersCollection.findOne({ email: userEmail });
     const userTier = user?.tier?.toLowerCase() || "free";
-    const purchasedCount = await purchasesCollection.countDocuments({ userEmail });
+    const purchasedCount = await purchasesCollection.countDocuments({
+      userEmail,
+    });
 
     let limit = 3;
     if (userTier === "pro") limit = 9;
     if (userTier === "premium") limit = Infinity;
 
     if (purchasedCount >= limit) {
-      return res.status(403).json({ success: false, error: `Limit Reached! Your subscription (${userTier}) is limited to ${limit} artworks.` });
+      return res.status(403).json({
+        success: false,
+        error: `Limit Reached! Your subscription (${userTier}) is limited to ${limit} artworks.`,
+      });
     }
 
-    const existingPurchase = await purchasesCollection.findOne({ userEmail, artworkId: new ObjectId(artworkId) });
-    if (existingPurchase) return res.status(400).json({ success: false, error: "You have already purchased this artwork." });
+    const existingPurchase = await purchasesCollection.findOne({
+      userEmail,
+      artworkId: new ObjectId(artworkId),
+    });
+    if (existingPurchase)
+      return res.status(400).json({
+        success: false,
+        error: "You have already purchased this artwork.",
+      });
 
     const result = await purchasesCollection.insertOne({
       userEmail,
@@ -332,7 +448,11 @@ app.post("/api/purchases", async (req, res) => {
       status: "Successful",
     });
 
-    res.status(201).json({ success: true, message: "Artwork purchased successfully!", data: result });
+    res.status(201).json({
+      success: true,
+      message: "Artwork purchased successfully!",
+      data: result,
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: "Internal Server Error" });
   }
@@ -343,8 +463,14 @@ app.get("/api/purchases", async (req, res) => {
   try {
     const { purchasesCollection } = await getCollections();
     const { email } = req.query;
-    if (!email) return res.status(400).json({ success: false, error: "Email query param is required" });
-    const result = await purchasesCollection.find({ userEmail: email }).sort({ purchaseDate: -1 }).toArray();
+    if (!email)
+      return res
+        .status(400)
+        .json({ success: false, error: "Email query param is required" });
+    const result = await purchasesCollection
+      .find({ userEmail: email })
+      .sort({ purchaseDate: -1 })
+      .toArray();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ success: false, error: "Internal Server Error" });
@@ -356,8 +482,14 @@ app.get("/api/payments/history", async (req, res) => {
   try {
     const { transactionsCollection } = await getCollections();
     const { email } = req.query;
-    if (!email) return res.status(400).json({ success: false, error: "Email query param is required" });
-    const result = await transactionsCollection.find({ email }).sort({ date: -1 }).toArray();
+    if (!email)
+      return res
+        .status(400)
+        .json({ success: false, error: "Email query param is required" });
+    const result = await transactionsCollection
+      .find({ email })
+      .sort({ date: -1 })
+      .toArray();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
     res.status(500).json({ error: "Internal Server Error" });
@@ -373,7 +505,9 @@ app.get("/api/admin/users", async (req, res) => {
     const result = await usersCollection.find({}).toArray();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, error: "Failed to fetch users list" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch users list" });
   }
 });
 
@@ -382,18 +516,27 @@ app.patch("/api/admin/update-role", async (req, res) => {
   try {
     const { usersCollection } = await getCollections();
     const { userId, newRole } = req.body;
-    if (!userId || !newRole) return res.status(400).json({ success: false, error: "Missing userId or newRole" });
+    if (!userId || !newRole)
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing userId or newRole" });
 
     const validRoles = ["user", "artist", "admin"];
-    if (!validRoles.includes(newRole.toLowerCase())) return res.status(400).json({ success: false, error: "Invalid role type" });
+    if (!validRoles.includes(newRole.toLowerCase()))
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid role type" });
 
     const result = await usersCollection.updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { role: newRole.toLowerCase(), updatedAt: new Date() } }
+      { $set: { role: newRole.toLowerCase(), updatedAt: new Date() } },
     );
 
     if (result.modifiedCount > 0 || result.matchedCount > 0) {
-      res.status(200).json({ success: true, message: `User role successfully updated to ${newRole}! 🎉` });
+      res.status(200).json({
+        success: true,
+        message: `User role successfully updated to ${newRole}! 🎉`,
+      });
     } else {
       res.status(404).json({ success: false, error: "User not found" });
     }
@@ -406,10 +549,15 @@ app.patch("/api/admin/update-role", async (req, res) => {
 app.get("/api/admin/artworks", async (req, res) => {
   try {
     const { artworksCollection } = await getCollections();
-    const result = await artworksCollection.find({}).sort({ _id: -1 }).toArray();
+    const result = await artworksCollection
+      .find({})
+      .sort({ _id: -1 })
+      .toArray();
     res.status(200).json({ success: true, data: result });
   } catch (error) {
-    res.status(500).json({ success: false, error: "Failed to fetch all artworks" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to fetch all artworks" });
   }
 });
 
@@ -419,12 +567,18 @@ app.patch("/api/admin/approve-artwork/:id", async (req, res) => {
     const { artworksCollection } = await getCollections();
     const result = await artworksCollection.updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $set: { status: "approved", publishedAt: new Date() } }
+      { $set: { status: "approved", publishedAt: new Date() } },
     );
     if (result.modifiedCount > 0) {
-      res.status(200).json({ success: true, message: "Artwork approved and published successfully! 🚀" });
+      res.status(200).json({
+        success: true,
+        message: "Artwork approved and published successfully! 🚀",
+      });
     } else {
-      res.status(404).json({ success: false, error: "Artwork not found or already approved" });
+      res.status(404).json({
+        success: false,
+        error: "Artwork not found or already approved",
+      });
     }
   } catch (error) {
     res.status(500).json({ success: false, error: "Internal Server Error" });
@@ -435,8 +589,14 @@ app.patch("/api/admin/approve-artwork/:id", async (req, res) => {
 app.get("/api/admin/transactions", async (req, res) => {
   try {
     const { transactionsCollection } = await getCollections();
-    const result = await transactionsCollection.find({}).sort({ date: -1 }).toArray();
-    const formattedData = result.map((tx) => ({ ...tx, type: tx.packageName ? "Subscription" : "Purchase" }));
+    const result = await transactionsCollection
+      .find({})
+      .sort({ date: -1 })
+      .toArray();
+    const formattedData = result.map((tx) => ({
+      ...tx,
+      type: tx.packageName ? "Subscription" : "Purchase",
+    }));
     res.status(200).json({ success: true, data: formattedData });
   } catch (error) {
     res.status(500).json({ success: false, error: "Internal Server Error" });
@@ -446,22 +606,44 @@ app.get("/api/admin/transactions", async (req, res) => {
 // GET analytics data (admin)
 app.get("/api/admin/analytics-data", async (req, res) => {
   try {
-    const { usersCollection, artworksCollection, transactionsCollection } = await getCollections();
+    const { usersCollection, artworksCollection, transactionsCollection } =
+      await getCollections();
 
     const totalUsers = await usersCollection.countDocuments({ role: "user" });
-    const totalArtists = await usersCollection.countDocuments({ role: "artist" });
-    const totalArtworksSold = await transactionsCollection.countDocuments({ packageName: { $exists: false } });
+    const totalArtists = await usersCollection.countDocuments({
+      role: "artist",
+    });
+    const totalArtworksSold = await transactionsCollection.countDocuments({
+      packageName: { $exists: false },
+    });
 
-    const revenueAggregation = await transactionsCollection.aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }]).toArray();
+    const revenueAggregation = await transactionsCollection
+      .aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }])
+      .toArray();
     const totalRevenue = revenueAggregation[0]?.total || 0;
 
-    const monthlySales = await transactionsCollection.aggregate([
-      { $group: { _id: { $dateToString: { format: "%b", date: "$date" } }, revenue: { $sum: "$amount" } } },
-    ]).toArray();
-    const salesData = monthlySales.map((item) => ({ date: item._id, revenue: item.revenue }));
+    const monthlySales = await transactionsCollection
+      .aggregate([
+        {
+          $group: {
+            _id: { $dateToString: { format: "%b", date: "$date" } },
+            revenue: { $sum: "$amount" },
+          },
+        },
+      ])
+      .toArray();
+    const salesData = monthlySales.map((item) => ({
+      date: item._id,
+      revenue: item.revenue,
+    }));
 
-    const categoryAggregation = await artworksCollection.aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }]).toArray();
-    const categoryData = categoryAggregation.map((item) => ({ name: item._id || "Uncategorized", count: item.count }));
+    const categoryAggregation = await artworksCollection
+      .aggregate([{ $group: { _id: "$category", count: { $sum: 1 } } }])
+      .toArray();
+    const categoryData = categoryAggregation.map((item) => ({
+      name: item._id || "Uncategorized",
+      count: item.count,
+    }));
 
     res.status(200).json({
       success: true,
@@ -470,8 +652,12 @@ app.get("/api/admin/analytics-data", async (req, res) => {
         totalArtists,
         totalArtworksSold,
         totalRevenue,
-        salesData: salesData.length > 0 ? salesData : [{ date: "No Data", revenue: 0 }],
-        categoryData: categoryData.length > 0 ? categoryData : [{ name: "No Data", count: 1 }],
+        salesData:
+          salesData.length > 0 ? salesData : [{ date: "No Data", revenue: 0 }],
+        categoryData:
+          categoryData.length > 0
+            ? categoryData
+            : [{ name: "No Data", count: 1 }],
       },
     });
   } catch (error) {
